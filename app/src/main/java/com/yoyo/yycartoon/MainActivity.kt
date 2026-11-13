@@ -10,6 +10,8 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.DocumentsContract
 import android.util.Log
 import android.view.Gravity
@@ -24,6 +26,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import java.security.MessageDigest
+import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
     private lateinit var preferences: SharedPreferences
@@ -48,6 +51,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var watchHistory: WatchHistory
     private var speechCoach: SpeechCoach? = null
     private var speechReady = false
+    private val dailyRefreshHandler = Handler(Looper.getMainLooper())
+    private val dailyRefresh = Runnable {
+        updateUi()
+        scheduleNextDayRefresh()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -577,9 +585,34 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        syncEpisodeCountWithQuota()
         updateUi()
+        scheduleNextDayRefresh()
         if (speechReady) speakWelcome()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateUi()
+    }
+
+    private fun scheduleNextDayRefresh() {
+        dailyRefreshHandler.removeCallbacks(dailyRefresh)
+        val nextDay = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        dailyRefreshHandler.postDelayed(
+            dailyRefresh,
+            (nextDay.timeInMillis - System.currentTimeMillis()).coerceAtLeast(1000L)
+        )
+    }
+
+    override fun onStop() {
+        dailyRefreshHandler.removeCallbacks(dailyRefresh)
+        super.onStop()
     }
 
     override fun onDestroy() {

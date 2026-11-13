@@ -7,7 +7,6 @@ import java.util.Date
 import java.util.Locale
 
 class WatchHistory(private val preferences: SharedPreferences) {
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA)
 
     fun getDailyCount(): Int {
         rolloverDailyState()
@@ -37,6 +36,7 @@ class WatchHistory(private val preferences: SharedPreferences) {
     }
 
     fun resetToday() {
+        rolloverDailyState()
         val edit = preferences.edit().putInt(DAILY_COUNT, 0)
         preferences.all.keys.forEach { key ->
             if (key.startsWith(DAILY_COUNTED_PREFIX)) {
@@ -90,7 +90,7 @@ class WatchHistory(private val preferences: SharedPreferences) {
 
     private fun rolloverDailyState() {
         val today = today()
-        if (preferences.getString(DAILY_DATE, today) == today) return
+        if (preferences.getString(DAILY_DATE, null) == today) return
         val edit = preferences.edit()
             .putString(DAILY_DATE, today)
             .putInt(DAILY_COUNT, 0)
@@ -102,7 +102,7 @@ class WatchHistory(private val preferences: SharedPreferences) {
         edit.apply()
     }
 
-    private fun today(): String = dateFormat.format(Date())
+    private fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date())
 
     private fun stableKey(video: VideoItem): String {
         val raw = video.uri.toString() + "|" + video.displayName
