@@ -15,6 +15,7 @@
     <string name="content_type_mini">迷你版</string>
     <string name="content_type_random">随便看</string>
     <string name="start_watching">开始观看</string>
+    <string name="choose_episode">选一集 · 当前：%1$s</string>
     <string name="daily_quota_used_short">今日额度已完成</string>
     <string name="choose_video_folder">选择视频位置</string>
     <string name="source_not_selected">还没有选择视频位置</string>
@@ -31,6 +32,11 @@
     <string name="rest_final_countdown">休息一下，%1$d 秒后结束</string>
     <string name="rest_hint">看看远处，让眼睛休息一下</string>
     <string name="source_media_count">本机/模拟器媒体库 · 找到 %1$d 个视频</string>
+    <string name="video_picker_title">今天想看哪一集？</string>
+    <string name="video_picker_subtitle">先选季，再选从哪一集开始；后面的视频会按顺序连播</string>
+    <string name="season_title">选择季 / 目录</string>
+    <string name="episode_title">选择视频</string>
+    <string name="index_saved_locally">U盘暂时不能写入，索引已保存在电视缓存；重新选择U盘并允许写入后可保存到U盘</string>
     <string name="episode_mode_title">今天想看哪一种？</string>
     <string name="episode_selector_hint">遥控器上下键调整集数</string>
     <string name="session_done_title">今天的约定完成啦</string>
@@ -68,5 +74,7 @@
     <string name="parent_option_reset_pin">重置家长密码</string>
     <string name="parent_option_reset_today">重置今日观看额度</string>
     <string name="parent_option_reset_history">清空观看记录和断点</string>
+    <string name="parent_option_rebuild_index">重建视频索引</string>
+    <string name="index_rebuild_need_folder">请先选择U盘视频目录，再重建索引</string>
     <string name="parent_records_summary">已看完记录：%1$d 个</string>
 </resources>

@@ -40,6 +40,19 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="16sp" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/parentRebuildIndexButton"
+            android:layout_width="match_parent"
+            android:layout_height="66dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/parent_option_button"
+            android:stateListAnimator="@null"
+            android:text="@string/parent_option_rebuild_index"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="19sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout

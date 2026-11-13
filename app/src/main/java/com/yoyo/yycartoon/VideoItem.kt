@@ -6,10 +6,14 @@ import android.os.Parcelable
 
 data class VideoItem(
     val uri: Uri,
-    val displayName: String
+    val displayName: String,
+    val season: String = DEFAULT_SEASON,
+    val relativePath: String = ""
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readParcelable(Uri::class.java.classLoader) ?: Uri.EMPTY,
+        parcel.readString().orEmpty(),
+        parcel.readString().orEmpty(),
         parcel.readString().orEmpty()
     )
 
@@ -18,9 +22,13 @@ data class VideoItem(
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeParcelable(uri, flags)
         parcel.writeString(displayName)
+        parcel.writeString(season)
+        parcel.writeString(relativePath)
     }
 
     companion object {
+        const val DEFAULT_SEASON = "第1季"
+
         @JvmField
         val CREATOR = object : Parcelable.Creator<VideoItem> {
             override fun createFromParcel(parcel: Parcel): VideoItem = VideoItem(parcel)

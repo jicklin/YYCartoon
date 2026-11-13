@@ -271,13 +271,27 @@
                 android:layout_marginTop="16dp"
                 android:background="@drawable/primary_button"
                 android:nextFocusUp="@id/normalButton"
-                android:nextFocusDown="@id/chooseFolderButton"
+                android:nextFocusDown="@id/chooseEpisodeButton"
                 android:stateListAnimator="@null"
                 android:text="@string/start_watching"
                 android:textAllCaps="false"
                 android:textColor="#121B47"
                 android:textSize="24sp"
                 android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/chooseEpisodeButton"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/secondary_button"
+                android:nextFocusUp="@id/startButton"
+                android:nextFocusDown="@id/chooseFolderButton"
+                android:stateListAnimator="@null"
+                android:text="@string/choose_episode"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -291,7 +305,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@drawable/secondary_button"
-                    android:nextFocusUp="@id/startButton"
+                    android:nextFocusUp="@id/chooseEpisodeButton"
                     android:nextFocusRight="@id/parentCenterButton"
                     android:nextFocusDown="@id/episodeSelector"
                     android:stateListAnimator="@null"

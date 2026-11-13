@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var miniButton: Button
     private lateinit var randomButton: Button
     private lateinit var startButton: Button
+    private lateinit var chooseEpisodeButton: Button
     private lateinit var chooseFolderButton: Button
     private lateinit var parentCenterButton: Button
     private lateinit var decreaseButton: Button
@@ -47,6 +48,8 @@ class MainActivity : AppCompatActivity() {
     private var episodeCount = 4
     private var watchMode = WatchMode.NORMAL
     private var videos: List<VideoItem> = emptyList()
+    private var seasons: List<String> = emptyList()
+    private var selectedSeason = VideoItem.DEFAULT_SEASON
     private var loadingVideos = false
     private lateinit var watchHistory: WatchHistory
     private var speechCoach: SpeechCoach? = null
@@ -89,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         miniButton = findViewById(R.id.miniButton)
         randomButton = findViewById(R.id.randomButton)
         startButton = findViewById(R.id.startButton)
+        chooseEpisodeButton = findViewById(R.id.chooseEpisodeButton)
         chooseFolderButton = findViewById(R.id.chooseFolderButton)
         parentCenterButton = findViewById(R.id.parentCenterButton)
     }
@@ -100,6 +104,8 @@ class MainActivity : AppCompatActivity() {
             ?: preferences.getString(STATE_WATCH_MODE, WatchMode.NORMAL.name)
                 ?.let { runCatching { WatchMode.valueOf(it) }.getOrNull() }
             ?: WatchMode.NORMAL
+        selectedSeason = savedInstanceState?.getString(STATE_SELECTED_SEASON)
+            ?: preferences.getString(STATE_SELECTED_SEASON, VideoItem.DEFAULT_SEASON).orEmpty()
     }
 
     private fun setupListeners() {
@@ -109,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         miniButton.setOnClickListener { selectMode(WatchMode.MINI) }
         randomButton.setOnClickListener { selectMode(WatchMode.RANDOM) }
         startButton.setOnClickListener { startWatching() }
+        chooseEpisodeButton.setOnClickListener { showVideoPicker() }
         chooseFolderButton.setOnClickListener { chooseFolder() }
         parentCenterButton.setOnClickListener { openParentCenter() }
         episodeSelector.post { episodeSelector.requestFocus() }
@@ -151,7 +158,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseFolder() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
             putExtra(DocumentsContract.EXTRA_EXCLUDE_SELF, false)
         }
         // Some Android TV images resolve this intent to a stub that cannot select directories.
@@ -180,7 +191,7 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             contentResolver.takePersistableUriPermission(
                 uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
         }
         preferences.edit().putString(STATE_SOURCE_URI, uri.toString()).apply()
@@ -203,14 +214,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadFolder(uri: Uri) {
+    private fun loadFolder(uri: Uri, forceRebuild: Boolean = false) {
+        if (loadingVideos) return
         loadingVideos = true
         statusText.setText(R.string.loading_videos)
         Thread {
-            val loaded = runCatching { VideoLibrary.load(this, uri) }.getOrDefault(emptyList())
+            val loaded = runCatching { VideoLibrary.load(this, uri, forceRebuild) }
+                .onFailure { Log.e("YYCartoon", "Failed to load indexed videos", it) }
+                .getOrDefault(
+                    VideoLibrary.IndexResult(
+                        videos = emptyList(),
+                        seasons = emptyList(),
+                        fromCache = false,
+                        savedToUsb = false
+                    )
+                )
             runOnUiThread {
                 loadingVideos = false
-                videos = loaded
+                videos = loaded.videos
+                seasons = loaded.seasons
+                selectedSeason = selectedSeason.takeIf { seasons.contains(it) }
+                    ?: seasons.firstOrNull()
+                    ?: VideoItem.DEFAULT_SEASON
+                preferences.edit().putString(STATE_SELECTED_SEASON, selectedSeason).apply()
+                if (loaded.videos.isNotEmpty() && !loaded.savedToUsb) {
+                    Toast.makeText(this, R.string.index_saved_locally, Toast.LENGTH_LONG).show()
+                }
                 updateUi()
             }
         }.start()
@@ -236,6 +265,8 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 loadingVideos = false
                 videos = loaded
+                seasons = emptyList()
+                selectedSeason = VideoItem.DEFAULT_SEASON
                 updateUi()
             }
         }.start()
@@ -280,7 +311,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val plannedCount = minOf(episodeCount, dailyRemaining)
-        val playlist = VideoLibrary.buildPlaylist(videos, watchMode, plannedCount) {
+        val playlist = VideoLibrary.buildPlaylist(selectedVideos(), watchMode, plannedCount) {
             watchHistory.isWatched(it)
         }
         if (playlist.isEmpty()) {
@@ -292,9 +323,19 @@ class MainActivity : AppCompatActivity() {
             statusText.text = message
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
+        launchPlaylist(playlist, plannedCount)
+    }
+
+    private fun selectedVideos(): List<VideoItem> {
+        return if (seasons.size <= 1) videos else videos.filter { it.season == selectedSeason }
+    }
+
+    private fun launchPlaylist(playlist: List<VideoItem>, plannedCount: Int) {
+        if (playlist.isEmpty()) return
         preferences.edit()
             .putInt(STATE_EPISODE_COUNT, plannedCount)
             .putString(STATE_WATCH_MODE, watchMode.name)
+            .putString(STATE_SELECTED_SEASON, selectedSeason)
             .apply()
         speechCoach?.stop()
         val intent = Intent(this, PlayerActivity::class.java)
@@ -336,6 +377,8 @@ class MainActivity : AppCompatActivity() {
                 R.string.daily_quota_used_short
             }
         )
+        chooseEpisodeButton.text = getString(R.string.choose_episode, selectedSeason)
+        chooseEpisodeButton.isEnabled = videos.isNotEmpty()
 
         if (!loadingVideos) {
             val savedUri = preferences.getString(STATE_SOURCE_URI, null)
@@ -344,8 +387,9 @@ class MainActivity : AppCompatActivity() {
                 videos.isEmpty() -> getString(R.string.no_videos)
                 savedUri == DEVICE_LIBRARY_URI -> getString(R.string.source_media_count, videos.size)
                 else -> {
-                    val available = VideoLibrary.filterByMode(videos, watchMode).size
-                    getString(R.string.source_selected, "已找到 $available 个视频")
+                    val available = VideoLibrary.filterByMode(selectedVideos(), watchMode).size
+                    val seasonLabel = if (seasons.size > 1) " · $selectedSeason" else ""
+                    getString(R.string.source_selected, "已找到 $available 个视频$seasonLabel")
                 }
             }
         }
@@ -511,6 +555,10 @@ class MainActivity : AppCompatActivity() {
             updateUi()
             Toast.makeText(this, R.string.history_reset_done, Toast.LENGTH_LONG).show()
         }
+        contentView.findViewById<Button>(R.id.parentRebuildIndexButton).setOnClickListener {
+            dialog.dismiss()
+            rebuildVideoIndex()
+        }
         contentView.findViewById<Button>(R.id.parentCloseButton).setOnClickListener {
             dialog.dismiss()
         }
@@ -552,6 +600,103 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun showVideoPicker() {
+        if (loadingVideos || seasons.isEmpty() || videos.isEmpty()) {
+            Toast.makeText(this, R.string.no_videos, Toast.LENGTH_LONG).show()
+            return
+        }
+        val dialog = createStyledDialog(R.layout.dialog_video_picker)
+        val contentView = dialog.findViewById<android.view.View>(android.R.id.content)
+        val seasonGrid = contentView.findViewById<GridLayout>(R.id.seasonGrid)
+        val videoGrid = contentView.findViewById<GridLayout>(R.id.videoGrid)
+        val density = resources.displayMetrics.density
+        val spacing = (8 * density).toInt()
+
+        fun renderVideos() {
+            videoGrid.removeAllViews()
+            selectedVideos().forEach { video ->
+                val button = Button(this)
+                button.text = video.displayName
+                button.textSize = 16f
+                button.isAllCaps = false
+                button.stateListAnimator = null
+                button.setTextColor(getColor(R.color.text_primary))
+                button.background = getDrawable(R.drawable.parent_option_button)
+                button.layoutParams = GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = (64 * density).toInt()
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    setMargins(0, 0, spacing, spacing)
+                }
+                button.setOnClickListener {
+                    if (watchHistory.getDailyRemaining() == 0) {
+                        Toast.makeText(this, R.string.daily_quota_used, Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                    val plannedCount = minOf(episodeCount, watchHistory.getDailyRemaining())
+                    val playlist = selectedVideos()
+                        .dropWhile { it.uri != video.uri }
+                        .take(plannedCount)
+                    dialog.dismiss()
+                    launchPlaylist(playlist, plannedCount)
+                }
+                videoGrid.addView(button)
+            }
+        }
+
+        fun renderSeasons() {
+            seasonGrid.removeAllViews()
+            seasons.forEach { season ->
+                val button = Button(this)
+                button.text = season
+                button.textSize = 17f
+                button.isAllCaps = false
+                button.stateListAnimator = null
+                button.isSelected = season == selectedSeason
+                button.setTextColor(
+                    if (button.isSelected) getColor(R.color.text_primary)
+                    else getColor(R.color.text_secondary)
+                )
+                button.background = getDrawable(R.drawable.parent_limit_button)
+                button.layoutParams = GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = (58 * density).toInt()
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    setMargins(0, 0, spacing, spacing)
+                }
+                button.setOnClickListener {
+                    selectedSeason = season
+                    preferences.edit().putString(STATE_SELECTED_SEASON, selectedSeason).apply()
+                    renderSeasons()
+                    renderVideos()
+                    updateUi()
+                }
+                seasonGrid.addView(button)
+            }
+        }
+
+        renderSeasons()
+        renderVideos()
+        contentView.findViewById<Button>(R.id.videoPickerCloseButton).setOnClickListener {
+            dialog.dismiss()
+        }
+        dialog.show()
+    }
+
+    private fun rebuildVideoIndex() {
+        val savedUri = preferences.getString(STATE_SOURCE_URI, null)
+        val uri = savedUri
+            ?.takeIf { it != DEVICE_LIBRARY_URI }
+            ?.let { runCatching { Uri.parse(it) }.getOrNull() }
+        if (uri == null) {
+            Toast.makeText(this, R.string.index_rebuild_need_folder, Toast.LENGTH_LONG).show()
+            return
+        }
+        loadFolder(uri, forceRebuild = true)
+    }
+
     private fun createStyledDialog(layoutId: Int): Dialog {
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -581,6 +726,7 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_EPISODE_COUNT, episodeCount)
         outState.putSerializable(STATE_WATCH_MODE, watchMode)
+        outState.putString(STATE_SELECTED_SEASON, selectedSeason)
     }
 
     override fun onStart() {
@@ -625,6 +771,7 @@ class MainActivity : AppCompatActivity() {
         private const val STATE_SOURCE_URI = "source_uri"
         private const val STATE_EPISODE_COUNT = "episode_count"
         private const val STATE_WATCH_MODE = "watch_mode"
+        private const val STATE_SELECTED_SEASON = "selected_season"
         private const val PARENT_PIN_HASH = "parent_pin_hash"
         private const val REQUEST_FOLDER = 1001
         private const val REQUEST_VIDEO_PERMISSION = 1002
