@@ -22,8 +22,9 @@ object VideoLibrary {
         if (!root.isDirectory) return emptyList()
         val videos = mutableListOf<VideoItem>()
         collectVideos(root, videos, 0)
+        val order = naturalOrder()
         return videos.sortedWith { left, right ->
-            naturalOrder().compare(left.displayName, right.displayName)
+            order.compare(left.displayName, right.displayName)
         }
     }
 
@@ -54,8 +55,9 @@ object VideoLibrary {
                 )
             }
         }
+        val order = naturalOrder()
         return videos.sortedWith { left, right ->
-            naturalOrder().compare(left.displayName, right.displayName)
+            order.compare(left.displayName, right.displayName)
         }
     }
 
