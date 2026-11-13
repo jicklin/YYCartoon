@@ -1,0 +1,95 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="660dp"
+    android:layout_height="wrap_content"
+    android:background="@drawable/parent_dialog_background"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:contentDescription="@string/parent_center"
+            android:src="@drawable/parent_center_icon" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/parent_center"
+                android:textColor="@color/text_primary"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/parent_center_subtitle"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="86dp"
+            android:orientation="horizontal">
+
+            <Button android:id="@+id/parentLimitButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:textAllCaps="false" android:textSize="19sp" android:textStyle="bold" />
+            <Button android:id="@+id/parentResetPinButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="12dp" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:text="@string/parent_option_reset_pin" android:textAllCaps="false" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="86dp"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Button android:id="@+id/parentResetTodayButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:text="@string/parent_option_reset_today" android:textAllCaps="false" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" />
+            <Button android:id="@+id/parentResetHistoryButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_marginStart="12dp" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:text="@string/parent_option_reset_history" android:textAllCaps="false" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/parentSummaryText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/parent_summary_background"
+        android:gravity="center"
+        android:minHeight="56dp"
+        android:padding="12dp"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/parentCloseButton"
+        android:layout_width="220dp"
+        android:layout_height="54dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="18dp"
+        android:background="@drawable/parent_cancel_button"
+        android:stateListAnimator="@null"
+        android:text="@string/close"
+        android:textAllCaps="false"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp" />
+</LinearLayout>

@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.YYCartoon" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/tv_background</item>
+        <item name="android:colorBackground">@color/tv_background</item>
+        <item name="colorAccent">@color/accent_pink</item>
+    </style>
+
+    <style name="Theme.YYCartoon.Player" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>

@@ -1,0 +1,338 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/home_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:paddingStart="38dp"
+        android:paddingTop="30dp"
+        android:paddingEnd="38dp"
+        android:paddingBottom="64dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingEnd="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/home_hero_panel"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="22dp">
+
+                <ImageView
+                    android:layout_width="108dp"
+                    android:layout_height="108dp"
+                    android:contentDescription="@string/app_name"
+                    android:src="@drawable/pig_avatar" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="22dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/hero_badge"
+                        android:paddingStart="12dp"
+                        android:paddingTop="4dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="4dp"
+                        android:text="@string/hero_badge"
+                        android:textColor="@color/accent_yellow"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/child_name"
+                        android:textColor="@color/text_primary"
+                        android:textSize="39sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/welcome_title"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="19sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/home_panel"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/daily_progress_title"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp" />
+
+                <ProgressBar
+                    android:id="@+id/dailyProgressBar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:layout_marginTop="10dp"
+                    android:max="4"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/daily_progress" />
+
+                <TextView
+                    android:id="@+id/dailyProgressText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="19sp"
+                    android:textStyle="bold"
+                    tools:text="今天已看 0/4 集" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/remote_guide"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/episode_count_question"
+                android:textColor="@color/text_secondary"
+                android:textSize="17sp" />
+
+            <LinearLayout
+                android:id="@+id/episodeSelector"
+                android:layout_width="match_parent"
+                android:layout_height="132dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/episode_card"
+                android:descendantFocusability="beforeDescendants"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:nextFocusDown="@id/normalButton"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/decreaseButton"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:background="@drawable/round_button"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:gravity="center"
+                    android:text="－"
+                    android:textColor="@color/text_primary"
+                    android:textSize="27sp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="18dp"
+                    android:layout_marginEnd="18dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/episode_count_label"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/episodeCountText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/accent_yellow"
+                        android:textSize="46sp"
+                        android:textStyle="bold"
+                        tools:text="4 集" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/episode_selector_hint"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/increaseButton"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:background="@drawable/round_button"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:gravity="center"
+                    android:text="＋"
+                    android:textColor="@color/text_primary"
+                    android:textSize="27sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/episode_mode_title"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/normalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/mode_button"
+                    android:nextFocusUp="@id/episodeSelector"
+                    android:nextFocusDown="@id/startButton"
+                    android:stateListAnimator="@null"
+                    android:text="@string/content_type_normal"
+                    android:textAllCaps="false"
+                    android:textSize="17sp" />
+
+                <Button
+                    android:id="@+id/miniButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mode_button"
+                    android:nextFocusUp="@id/episodeSelector"
+                    android:nextFocusDown="@id/startButton"
+                    android:stateListAnimator="@null"
+                    android:text="@string/content_type_mini"
+                    android:textAllCaps="false"
+                    android:textSize="17sp" />
+
+                <Button
+                    android:id="@+id/randomButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/mode_button"
+                    android:nextFocusUp="@id/episodeSelector"
+                    android:nextFocusDown="@id/startButton"
+                    android:stateListAnimator="@null"
+                    android:text="@string/content_type_random"
+                    android:textAllCaps="false"
+                    android:textSize="17sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/startButton"
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/primary_button"
+                android:nextFocusUp="@id/normalButton"
+                android:nextFocusDown="@id/chooseFolderButton"
+                android:stateListAnimator="@null"
+                android:text="@string/start_watching"
+                android:textAllCaps="false"
+                android:textColor="#121B47"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/chooseFolderButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/secondary_button"
+                    android:nextFocusUp="@id/startButton"
+                    android:nextFocusRight="@id/parentCenterButton"
+                    android:nextFocusDown="@id/episodeSelector"
+                    android:stateListAnimator="@null"
+                    android:text="@string/choose_video_folder"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <Button
+                    android:id="@+id/parentCenterButton"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/secondary_button"
+                    android:nextFocusUp="@id/startButton"
+                    android:nextFocusLeft="@id/chooseFolderButton"
+                    android:nextFocusDown="@id/episodeSelector"
+                    android:stateListAnimator="@null"
+                    android:text="@string/parent_center"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="38dp"
+        android:layout_marginEnd="38dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/home_panel"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="2"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp" />
+</FrameLayout>
