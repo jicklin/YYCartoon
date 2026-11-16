@@ -13,10 +13,12 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
+import android.text.TextUtils
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Window
+import android.view.ViewGroup
 import android.widget.GridLayout
 import android.widget.Button
 import android.widget.ProgressBar
@@ -135,6 +137,11 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_LEFT,
                 KeyEvent.KEYCODE_CHANNEL_DOWN -> {
                     changeEpisodeCount(-1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    normalButton.requestFocus()
                     return true
                 }
             }
@@ -601,7 +608,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showVideoPicker() {
-        if (loadingVideos || seasons.isEmpty() || videos.isEmpty()) {
+        if (loadingVideos || videos.isEmpty()) {
             Toast.makeText(this, R.string.no_videos, Toast.LENGTH_LONG).show()
             return
         }
@@ -618,6 +625,8 @@ class MainActivity : AppCompatActivity() {
                 val button = Button(this)
                 button.text = video.displayName
                 button.textSize = 16f
+                button.maxLines = 2
+                button.ellipsize = TextUtils.TruncateAt.END
                 button.isAllCaps = false
                 button.stateListAnimator = null
                 button.setTextColor(getColor(R.color.text_primary))
@@ -647,10 +656,13 @@ class MainActivity : AppCompatActivity() {
 
         fun renderSeasons() {
             seasonGrid.removeAllViews()
-            seasons.forEach { season ->
+            val availableSeasons = seasons.ifEmpty { listOf(VideoItem.DEFAULT_SEASON) }
+            availableSeasons.forEach { season ->
                 val button = Button(this)
                 button.text = season
                 button.textSize = 17f
+                button.isSingleLine = true
+                button.ellipsize = TextUtils.TruncateAt.END
                 button.isAllCaps = false
                 button.stateListAnimator = null
                 button.isSelected = season == selectedSeason
@@ -671,6 +683,7 @@ class MainActivity : AppCompatActivity() {
                     preferences.edit().putString(STATE_SELECTED_SEASON, selectedSeason).apply()
                     renderSeasons()
                     renderVideos()
+                    seasonGrid.getChildAt(availableSeasons.indexOf(season))?.requestFocus()
                     updateUi()
                 }
                 seasonGrid.addView(button)
@@ -704,6 +717,24 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             setGravity(Gravity.CENTER)
+        }
+        dialog.setOnShowListener {
+            val density = resources.displayMetrics.density
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+            val desiredWidth = when (layoutId) {
+                R.layout.dialog_video_picker -> 760
+                R.layout.dialog_parent_pin -> 500
+                R.layout.dialog_parent_limit -> 620
+                else -> 660
+            }
+            val width = minOf((desiredWidth * density).toInt(), screenWidth - (48 * density).toInt())
+            val height = if (layoutId == R.layout.dialog_video_picker) {
+                minOf((480 * density).toInt(), screenHeight - (40 * density).toInt())
+            } else {
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            dialog.window?.setLayout(width, height)
         }
         return dialog
     }

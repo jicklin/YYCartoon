@@ -10,7 +10,7 @@
         android:baselineAligned="false"
         android:orientation="horizontal"
         android:paddingStart="38dp"
-        android:paddingTop="30dp"
+        android:paddingTop="24dp"
         android:paddingEnd="38dp"
         android:paddingBottom="64dp">
 
@@ -137,7 +137,7 @@
             <LinearLayout
                 android:id="@+id/episodeSelector"
                 android:layout_width="match_parent"
-                android:layout_height="132dp"
+                android:layout_height="112dp"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/episode_card"
                 android:descendantFocusability="beforeDescendants"
@@ -149,8 +149,8 @@
 
                 <Button
                     android:id="@+id/decreaseButton"
-                    android:layout_width="62dp"
-                    android:layout_height="62dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:background="@drawable/round_button"
                     android:clickable="true"
                     android:focusable="false"
@@ -163,8 +163,8 @@
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="18dp"
-                    android:layout_marginEnd="18dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
                     android:layout_weight="1"
                     android:gravity="center"
                     android:orientation="vertical">
@@ -181,7 +181,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/accent_yellow"
-                        android:textSize="46sp"
+                        android:textSize="40sp"
                         android:textStyle="bold"
                         tools:text="4 集" />
 
@@ -195,8 +195,8 @@
 
                 <Button
                     android:id="@+id/increaseButton"
-                    android:layout_width="62dp"
-                    android:layout_height="62dp"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
                     android:background="@drawable/round_button"
                     android:clickable="true"
                     android:focusable="false"
@@ -218,8 +218,8 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="54dp"
+                android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
                 <Button
@@ -267,8 +267,8 @@
             <Button
                 android:id="@+id/startButton"
                 android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:layout_marginTop="16dp"
+                android:layout_height="64dp"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/primary_button"
                 android:nextFocusUp="@id/normalButton"
                 android:nextFocusDown="@id/chooseEpisodeButton"
@@ -282,8 +282,8 @@
             <Button
                 android:id="@+id/chooseEpisodeButton"
                 android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/secondary_button"
                 android:nextFocusUp="@id/startButton"
                 android:nextFocusDown="@id/chooseFolderButton"
@@ -295,8 +295,8 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <Button

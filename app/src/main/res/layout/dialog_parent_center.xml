@@ -1,5 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="660dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/parent_dialog_background"
     android:orientation="vertical"
@@ -40,30 +40,30 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="16sp" />
         </LinearLayout>
-
-        <Button
-            android:id="@+id/parentRebuildIndexButton"
-            android:layout_width="match_parent"
-            android:layout_height="66dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/parent_option_button"
-            android:stateListAnimator="@null"
-            android:text="@string/parent_option_rebuild_index"
-            android:textAllCaps="false"
-            android:textColor="@color/text_primary"
-            android:textSize="19sp"
-            android:textStyle="bold" />
     </LinearLayout>
+
+    <Button
+        android:id="@+id/parentRebuildIndexButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/parent_option_button"
+        android:stateListAnimator="@null"
+        android:text="@string/parent_option_rebuild_index"
+        android:textAllCaps="false"
+        android:textColor="@color/text_primary"
+        android:textSize="19sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="86dp"
+            android:layout_height="70dp"
             android:orientation="horizontal">
 
             <Button android:id="@+id/parentLimitButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:textAllCaps="false" android:textSize="19sp" android:textStyle="bold" />
@@ -72,8 +72,8 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="86dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="70dp"
+            android:layout_marginTop="10dp"
             android:orientation="horizontal">
 
             <Button android:id="@+id/parentResetTodayButton" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/parent_option_button" android:stateListAnimator="@null" android:text="@string/parent_option_reset_today" android:textAllCaps="false" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" />

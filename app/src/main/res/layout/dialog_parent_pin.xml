@@ -1,5 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="500dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/parent_dialog_background"
     android:orientation="vertical"
@@ -121,7 +121,7 @@
             android:layout_weight="1"
             android:background="@drawable/parent_cancel_button"
             android:stateListAnimator="@null"
-            android:text="@android:string/cancel"
+            android:text="@string/cancel"
             android:textAllCaps="false"
             android:textColor="@color/text_primary"
             android:textSize="18sp" />
