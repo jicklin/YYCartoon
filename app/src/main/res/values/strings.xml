@@ -29,8 +29,12 @@
     <string name="speak_welcome">马呦呦小朋友，欢迎来到你的小剧场。请选一集开始，看完一集会计入今日额度哦。</string>
     <string name="now_playing">正在播放《%1$s》%2$s：%3$s。这一集播完会继续播放。</string>
     <string name="rest_look_outside">看完一集啦，看看窗外吧！</string>
-    <string name="rest_countdown">休息一下，%1$d 秒后继续</string>
-    <string name="rest_final_countdown">休息一下，%1$d 秒后结束</string>
+    <string name="rest_traffic_announcement">红灯亮啦，看看窗外，休息20秒。</string>
+    <string name="rest_countdown">还有 %1$d 秒</string>
+    <string name="rest_final_countdown">最后 %1$d 秒</string>
+    <string name="rest_phase_red">红灯 · 眼睛休息</string>
+    <string name="rest_phase_yellow">黄灯 · 坐好准备</string>
+    <string name="rest_phase_green">绿灯 · 马上开始</string>
     <string name="rest_hint">看看远处，让眼睛休息一下</string>
     <string name="source_media_count">本机/模拟器媒体库 · 找到 %1$d 个视频</string>
     <string name="video_picker_title">今天想看哪一集？</string>

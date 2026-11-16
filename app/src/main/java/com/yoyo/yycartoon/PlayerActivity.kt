@@ -20,6 +20,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var doneMessage: TextView
     private lateinit var restPanel: View
     private lateinit var restCountdownText: TextView
+    private lateinit var restPhaseText: TextView
+    private var restLights: List<TextView> = emptyList()
 
     private var playlist = mutableListOf<VideoItem>()
     private var currentIndex = 0
@@ -77,6 +79,12 @@ class PlayerActivity : AppCompatActivity() {
         doneMessage = findViewById(R.id.doneMessage)
         restPanel = findViewById(R.id.restPanel)
         restCountdownText = findViewById(R.id.restCountdown)
+        restPhaseText = findViewById(R.id.restPhaseText)
+        restLights = listOf(
+            findViewById(R.id.restRedLightText),
+            findViewById(R.id.restYellowLightText),
+            findViewById(R.id.restGreenLightText)
+        )
     }
 
     private fun playCurrent() {
@@ -140,7 +148,7 @@ class PlayerActivity : AppCompatActivity() {
         announcement.visibility = View.GONE
         restPanel.visibility = View.VISIBLE
         renderRestCountdown()
-        speechCoach?.speak(getString(R.string.rest_look_outside))
+        speechCoach?.speak(getString(R.string.rest_traffic_announcement))
         scheduleRestBreakTick()
     }
 
@@ -159,12 +167,36 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun renderRestCountdown() {
+        val activeLightIndex = activeRestLightIndex()
+        restLights.forEachIndexed { index, lightText ->
+            val light = lightText.parent as View
+            val isActive = index == activeLightIndex
+            light.alpha = if (isActive) 1f else 0.18f
+            lightText.text = if (isActive) restRemainingSeconds.toString() else ""
+        }
+        restPhaseText.text = getString(activeRestPhaseText())
         val textRes = if (restRemainingSeconds == 1) {
             R.string.rest_final_countdown
         } else {
             R.string.rest_countdown
         }
         restCountdownText.text = getString(textRes, restRemainingSeconds)
+    }
+
+    private fun activeRestLightIndex(): Int {
+        return when {
+            restRemainingSeconds > REST_YELLOW_START_SECONDS -> 0
+            restRemainingSeconds > REST_GREEN_START_SECONDS -> 1
+            else -> 2
+        }
+    }
+
+    private fun activeRestPhaseText(): Int {
+        return when (activeRestLightIndex()) {
+            0 -> R.string.rest_phase_red
+            1 -> R.string.rest_phase_yellow
+            else -> R.string.rest_phase_green
+        }
     }
 
     private fun finishRestBreak() {
@@ -347,6 +379,8 @@ class PlayerActivity : AppCompatActivity() {
         private const val PARENT_HOLD_DURATION = 3000L
         private const val DOUBLE_BACK_INTERVAL_MS = 1800L
         private const val REST_DURATION_SECONDS = 20
+        private const val REST_YELLOW_START_SECONDS = 8
+        private const val REST_GREEN_START_SECONDS = 3
         private const val PREFERENCES_NAME = "yoyo_cartoon"
     }
 }
