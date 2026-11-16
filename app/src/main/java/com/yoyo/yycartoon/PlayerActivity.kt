@@ -19,42 +19,36 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var donePanel: View
     private lateinit var doneMessage: TextView
     private lateinit var restPanel: View
-    private lateinit var restCountdown: TextView
+    private lateinit var restCountdownText: TextView
 
     private var playlist = mutableListOf<VideoItem>()
-    private var promisedCount = 0
     private var currentIndex = 0
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var announcementRemoval = Runnable {}
-    private val parentHoldHandler = Handler(Looper.getMainLooper())
-    private var resting = false
-    private var restSecondsRemaining = 0
-    private val restTick = object : Runnable {
-        override fun run() {
-            if (!resting) return
-            restSecondsRemaining--
-            if (restSecondsRemaining == 0) {
-                endRest()
-            } else {
-                updateRestCountdown()
-                mainHandler.postDelayed(this, 1000L)
-            }
-        }
-    }
-    private var parentHoldStart = 0L
-    private var parentHoldRunnable = Runnable {}
-    private var finished = false
-    private var speechCoach: SpeechCoach? = null
-    private lateinit var watchHistory: WatchHistory
     private var currentVideo: VideoItem? = null
     private var resumePosition = 0
+    private var finished = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var announcementRemoval = Runnable {}
+    private var restBreakRunnable = Runnable {}
+    private var restRemainingSeconds = 0
+    private var afterRestBreak: (() -> Unit)? = null
+    private val saveProgressRunnable = object : Runnable {
+        override fun run() {
+            saveCurrentPosition()
+            mainHandler.postDelayed(this, SAVE_PROGRESS_INTERVAL_MS)
+        }
+    }
+    private val parentHoldHandler = Handler(Looper.getMainLooper())
+    private var parentHoldStart = 0L
+    private var parentHoldRunnable = Runnable {}
+    private var lastBackPressTime = 0L
+    private var speechCoach: SpeechCoach? = null
+    private lateinit var watchHistory: WatchHistory
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
         bindViews()
         playlist = intent?.getParcelableArrayListExtra(MainActivity.EXTRA_PLAYLIST) ?: mutableListOf()
-        promisedCount = intent?.getIntExtra(MainActivity.EXTRA_PROMISED_COUNT, playlist.size) ?: playlist.size
         if (playlist.isEmpty()) {
             finish()
             return
@@ -62,17 +56,13 @@ class PlayerActivity : AppCompatActivity() {
         watchHistory = WatchHistory(getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE))
         speechCoach = SpeechCoach(this) { }
         videoView.setOnPreparedListener {
-            if (resumePosition > 0) {
-                videoView.seekTo(resumePosition)
-            }
+            if (resumePosition > 0) videoView.seekTo(resumePosition)
             videoView.start()
         }
-        videoView.setOnCompletionListener { playNext(watchedCurrent = true) }
+        videoView.setOnCompletionListener { playNextAfterCompletion() }
         videoView.setOnErrorListener { _, what, extra ->
-            if (!finished && !resting) {
-                Toast.makeText(this, "播放失败：$what/$extra", Toast.LENGTH_LONG).show()
-                playNext(watchedCurrent = false)
-            }
+            Toast.makeText(this, "播放失败：$what/$extra", Toast.LENGTH_LONG).show()
+            playNextAfterError()
             true
         }
         playCurrent()
@@ -86,25 +76,33 @@ class PlayerActivity : AppCompatActivity() {
         donePanel = findViewById(R.id.donePanel)
         doneMessage = findViewById(R.id.doneMessage)
         restPanel = findViewById(R.id.restPanel)
-        restCountdown = findViewById(R.id.restCountdown)
+        restCountdownText = findViewById(R.id.restCountdown)
     }
 
     private fun playCurrent() {
-        if (currentIndex >= playlist.size || currentIndex >= promisedCount) {
+        if (finished || currentIndex >= playlist.size) {
             finishSession()
             return
         }
+        saveCurrentPosition()
         val video = playlist[currentIndex]
-        if (currentVideo?.uri != video.uri) {
-            saveCurrentPosition()
-        }
         currentVideo = video
         resumePosition = watchHistory.getSavedPosition(video)
-        watchHistory.registerEpisodeStarted(video)
-        val remaining = promisedCount - currentIndex
+        watchHistory.setLastPlayed(video)
         playerTitle.text = video.displayName
-        playerProgress.text = String.format(Locale.CHINA, "%d / %d", currentIndex + 1, promisedCount)
-        val announcementText = getString(R.string.now_playing, currentIndex + 1, remaining)
+        playerProgress.text = String.format(
+            Locale.CHINA,
+            "%s · %d/%d",
+            video.season,
+            currentIndex + 1,
+            playlist.size
+        )
+        val announcementText = getString(
+            R.string.now_playing,
+            video.showName,
+            video.season,
+            video.displayName
+        )
         announcement.text = announcementText
         announcement.visibility = View.VISIBLE
         speechCoach?.speak(announcementText)
@@ -113,47 +111,78 @@ class PlayerActivity : AppCompatActivity() {
         mainHandler.postDelayed(announcementRemoval, ANNOUNCEMENT_DURATION)
         videoView.setVideoURI(video.uri)
         videoView.requestFocus()
+        mainHandler.removeCallbacks(saveProgressRunnable)
+        mainHandler.postDelayed(saveProgressRunnable, SAVE_PROGRESS_INTERVAL_MS)
     }
 
-    private fun playNext(watchedCurrent: Boolean) {
-        if (finished || resting) return
-        finishCurrentEpisode(watchedCurrent)
+    private fun playNextAfterCompletion() {
+        if (finished) return
+        val video = currentVideo ?: return
+        mainHandler.removeCallbacks(saveProgressRunnable)
+        watchHistory.markWatched(video)
+        watchHistory.clearPosition(video)
+        watchHistory.registerEpisodeCompleted(video)
+        watchHistory.registerPlayCompleted(video)
+        currentVideo = null
+        resumePosition = 0
         currentIndex++
-        if (watchedCurrent) {
-            startRest()
-        } else if (currentIndex >= promisedCount || currentIndex >= playlist.size) {
-            finishSession()
-        } else {
-            playCurrent()
+        when {
+            watchHistory.getDailyRemaining() == 0 -> finishSession()
+            currentIndex >= playlist.size -> finishSession()
+            else -> startRestBreak { playCurrent() }
         }
     }
 
-    private fun startRest() {
-        resting = true
-        restSecondsRemaining = REST_DURATION_SECONDS
-        mainHandler.removeCallbacks(announcementRemoval)
+    private fun startRestBreak(onBreakFinished: () -> Unit) {
+        if (finished) return
+        restRemainingSeconds = REST_DURATION_SECONDS
+        afterRestBreak = onBreakFinished
         announcement.visibility = View.GONE
-        videoView.stopPlayback()
         restPanel.visibility = View.VISIBLE
-        updateRestCountdown()
+        renderRestCountdown()
         speechCoach?.speak(getString(R.string.rest_look_outside))
-        mainHandler.postDelayed(restTick, 1000L)
+        scheduleRestBreakTick()
     }
 
-    private fun updateRestCountdown() {
-        val message = if (currentIndex >= promisedCount || currentIndex >= playlist.size) {
+    private fun scheduleRestBreakTick() {
+        mainHandler.removeCallbacks(restBreakRunnable)
+        restBreakRunnable = Runnable {
+            restRemainingSeconds--
+            if (restRemainingSeconds <= 0) {
+                finishRestBreak()
+            } else {
+                renderRestCountdown()
+                scheduleRestBreakTick()
+            }
+        }
+        mainHandler.postDelayed(restBreakRunnable, 1000L)
+    }
+
+    private fun renderRestCountdown() {
+        val textRes = if (restRemainingSeconds == 1) {
             R.string.rest_final_countdown
         } else {
             R.string.rest_countdown
         }
-        restCountdown.text = getString(message, restSecondsRemaining)
+        restCountdownText.text = getString(textRes, restRemainingSeconds)
     }
 
-    private fun endRest() {
-        mainHandler.removeCallbacks(restTick)
-        resting = false
+    private fun finishRestBreak() {
+        mainHandler.removeCallbacks(restBreakRunnable)
+        restRemainingSeconds = 0
         restPanel.visibility = View.GONE
-        if (currentIndex >= promisedCount || currentIndex >= playlist.size) {
+        val nextAction = afterRestBreak
+        afterRestBreak = null
+        if (!finished) nextAction?.invoke()
+    }
+
+    private fun playNextAfterError() {
+        if (finished) return
+        saveCurrentPosition()
+        currentVideo = null
+        resumePosition = 0
+        currentIndex++
+        if (currentIndex >= playlist.size) {
             finishSession()
         } else {
             playCurrent()
@@ -163,27 +192,32 @@ class PlayerActivity : AppCompatActivity() {
     private fun finishSession() {
         if (finished) return
         finished = true
-        resting = false
-        mainHandler.removeCallbacks(restTick)
         mainHandler.removeCallbacks(announcementRemoval)
+        mainHandler.removeCallbacks(saveProgressRunnable)
+        mainHandler.removeCallbacks(restBreakRunnable)
+        afterRestBreak = null
+        restRemainingSeconds = 0
         restPanel.visibility = View.GONE
-        announcement.visibility = View.GONE
         saveCurrentPosition()
         videoView.stopPlayback()
-        doneMessage.text = getString(R.string.session_done_message, promisedCount)
+        announcement.visibility = View.GONE
+        doneMessage.text = getString(
+            R.string.session_done_message,
+            watchHistory.getDailyCount()
+        )
         donePanel.visibility = View.VISIBLE
-        speechCoach?.speak(getString(R.string.session_done_message, promisedCount))
+        speechCoach?.speak(getString(R.string.session_done_message, watchHistory.getDailyCount()))
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
+        if (event.action == KeyEvent.ACTION_DOWN && !finished) {
             val seekAmount = when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> SEEK_STEP_MS
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> -SEEK_STEP_MS
                 else -> null
             }
             if (seekAmount != null) {
-                if (!finished && !resting) seekBy(seekAmount)
+                seekBy(seekAmount)
                 return true
             }
         }
@@ -211,44 +245,55 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            handleBackToPicker()
+            return true
+        }
+        if (restRemainingSeconds > 0) return true
         if (finished) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 parentHoldStart = System.currentTimeMillis()
-                parentHoldRunnable = Runnable {
-                    finish()
-                }
+                parentHoldRunnable = Runnable { finish() }
                 parentHoldHandler.postDelayed(parentHoldRunnable, PARENT_HOLD_DURATION)
                 return true
             }
             return true
         }
-        if (resting) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) finishSession()
-            return true
-        }
-
         return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                togglePlayback()
-                true
-            }
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                 togglePlayback()
-                true
-            }
-            KeyEvent.KEYCODE_BACK -> {
-                finishSession()
                 true
             }
             else -> super.onKeyDown(keyCode, event)
         }
     }
 
+    private fun handleBackToPicker() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackPressTime < DOUBLE_BACK_INTERVAL_MS) {
+            mainHandler.removeCallbacks(announcementRemoval)
+            mainHandler.removeCallbacks(saveProgressRunnable)
+            mainHandler.removeCallbacks(restBreakRunnable)
+            afterRestBreak = null
+            restRemainingSeconds = 0
+            saveCurrentPosition()
+            videoView.stopPlayback()
+            setResult(RESULT_OK)
+            finish()
+        } else {
+            lastBackPressTime = now
+            if (videoView.isPlaying) videoView.pause()
+            saveCurrentPosition()
+            Toast.makeText(this, R.string.press_back_again_to_picker, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (finished && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
             parentHoldHandler.removeCallbacks(parentHoldRunnable)
-            val held = System.currentTimeMillis() - parentHoldStart
-            if (held < PARENT_HOLD_DURATION) {
+            if (System.currentTimeMillis() - parentHoldStart < PARENT_HOLD_DURATION) {
                 Toast.makeText(this, R.string.parent_exit, Toast.LENGTH_SHORT).show()
             }
             return true
@@ -267,38 +312,25 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        mainHandler.removeCallbacks(restTick)
+        if (restRemainingSeconds > 0) mainHandler.removeCallbacks(restBreakRunnable)
         saveCurrentPosition()
-        if (!finished && videoView.isPlaying) {
-            videoView.pause()
-        }
+        if (!finished && videoView.isPlaying) videoView.pause()
         super.onPause()
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (resting) mainHandler.postDelayed(restTick, 1000L)
+    override fun onRestart() {
+        super.onRestart()
+        if (!finished && restRemainingSeconds > 0) scheduleRestBreakTick()
     }
 
     override fun onDestroy() {
         saveCurrentPosition()
-        parentHoldHandler.removeCallbacks(parentHoldRunnable)
-        mainHandler.removeCallbacks(restTick)
         mainHandler.removeCallbacks(announcementRemoval)
+        mainHandler.removeCallbacks(saveProgressRunnable)
+        mainHandler.removeCallbacks(restBreakRunnable)
+        parentHoldHandler.removeCallbacks(parentHoldRunnable)
         speechCoach?.shutdown()
         super.onDestroy()
-    }
-
-    private fun finishCurrentEpisode(watched: Boolean) {
-        val video = currentVideo ?: return
-        if (watched) {
-            watchHistory.markWatched(video)
-            watchHistory.clearPosition(video)
-        } else {
-            saveCurrentPosition()
-        }
-        currentVideo = null
-        resumePosition = 0
     }
 
     private fun saveCurrentPosition() {
@@ -310,8 +342,10 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val ANNOUNCEMENT_DURATION = 3800L
         private const val SEEK_ANNOUNCEMENT_DURATION = 2000L
+        private const val SAVE_PROGRESS_INTERVAL_MS = 5000L
         private const val SEEK_STEP_MS = 10_000
         private const val PARENT_HOLD_DURATION = 3000L
+        private const val DOUBLE_BACK_INTERVAL_MS = 1800L
         private const val REST_DURATION_SECONDS = 20
         private const val PREFERENCES_NAME = "yoyo_cartoon"
     }

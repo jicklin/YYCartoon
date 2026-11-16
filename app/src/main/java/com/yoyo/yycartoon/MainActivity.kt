@@ -32,25 +32,17 @@ import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
     private lateinit var preferences: SharedPreferences
-    private lateinit var episodeCountText: TextView
     private lateinit var dailyProgressBar: ProgressBar
     private lateinit var dailyProgressText: TextView
     private lateinit var statusText: TextView
-    private lateinit var episodeSelector: android.view.View
-    private lateinit var normalButton: Button
-    private lateinit var miniButton: Button
-    private lateinit var randomButton: Button
     private lateinit var startButton: Button
     private lateinit var chooseEpisodeButton: Button
     private lateinit var chooseFolderButton: Button
     private lateinit var parentCenterButton: Button
-    private lateinit var decreaseButton: Button
-    private lateinit var increaseButton: Button
 
-    private var episodeCount = 4
-    private var watchMode = WatchMode.NORMAL
     private var videos: List<VideoItem> = emptyList()
-    private var seasons: List<String> = emptyList()
+    private var shows: List<String> = emptyList()
+    private var selectedShow = VideoItem.DEFAULT_SHOW
     private var selectedSeason = VideoItem.DEFAULT_SEASON
     private var loadingVideos = false
     private lateinit var watchHistory: WatchHistory
@@ -83,16 +75,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
-        episodeSelector = findViewById(R.id.episodeSelector)
-        episodeCountText = findViewById(R.id.episodeCountText)
         dailyProgressBar = findViewById(R.id.dailyProgressBar)
         dailyProgressText = findViewById(R.id.dailyProgressText)
         statusText = findViewById(R.id.statusText)
-        decreaseButton = findViewById(R.id.decreaseButton)
-        increaseButton = findViewById(R.id.increaseButton)
-        normalButton = findViewById(R.id.normalButton)
-        miniButton = findViewById(R.id.miniButton)
-        randomButton = findViewById(R.id.randomButton)
         startButton = findViewById(R.id.startButton)
         chooseEpisodeButton = findViewById(R.id.chooseEpisodeButton)
         chooseFolderButton = findViewById(R.id.chooseFolderButton)
@@ -100,53 +85,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restoreState(savedInstanceState: Bundle?) {
-        episodeCount = savedInstanceState?.getInt(STATE_EPISODE_COUNT)
-            ?: preferences.getInt(STATE_EPISODE_COUNT, DEFAULT_EPISODES).coerceIn(1, MAX_EPISODES)
-        watchMode = savedInstanceState?.getSerializable(STATE_WATCH_MODE) as? WatchMode
-            ?: preferences.getString(STATE_WATCH_MODE, WatchMode.NORMAL.name)
-                ?.let { runCatching { WatchMode.valueOf(it) }.getOrNull() }
-            ?: WatchMode.NORMAL
+        selectedShow = savedInstanceState?.getString(STATE_SELECTED_SHOW)
+            ?: preferences.getString(STATE_SELECTED_SHOW, VideoItem.DEFAULT_SHOW).orEmpty()
         selectedSeason = savedInstanceState?.getString(STATE_SELECTED_SEASON)
             ?: preferences.getString(STATE_SELECTED_SEASON, VideoItem.DEFAULT_SEASON).orEmpty()
     }
 
     private fun setupListeners() {
-        decreaseButton.setOnClickListener { changeEpisodeCount(-1) }
-        increaseButton.setOnClickListener { changeEpisodeCount(1) }
-        normalButton.setOnClickListener { selectMode(WatchMode.NORMAL) }
-        miniButton.setOnClickListener { selectMode(WatchMode.MINI) }
-        randomButton.setOnClickListener { selectMode(WatchMode.RANDOM) }
         startButton.setOnClickListener { startWatching() }
         chooseEpisodeButton.setOnClickListener { showVideoPicker() }
         chooseFolderButton.setOnClickListener { chooseFolder() }
         parentCenterButton.setOnClickListener { openParentCenter() }
-        episodeSelector.post { episodeSelector.requestFocus() }
-    }
-
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val inEpisodeSelector = currentFocus?.id == R.id.episodeSelector
-        if (event.action == KeyEvent.ACTION_DOWN && inEpisodeSelector) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP,
-                KeyEvent.KEYCODE_DPAD_RIGHT,
-                KeyEvent.KEYCODE_CHANNEL_UP -> {
-                    changeEpisodeCount(1)
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_DPAD_LEFT,
-                KeyEvent.KEYCODE_CHANNEL_DOWN -> {
-                    changeEpisodeCount(-1)
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER -> {
-                    normalButton.requestFocus()
-                    return true
-                }
-            }
-        }
-        return super.dispatchKeyEvent(event)
+        startButton.post { startButton.requestFocus() }
     }
 
     private fun maybeLoadSavedFolder() {
@@ -187,6 +137,12 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_PLAY_VIDEO) {
+            if (resultCode == Activity.RESULT_OK && videos.isNotEmpty()) {
+                showVideoPicker()
+            }
+            return
+        }
         if (requestCode != REQUEST_FOLDER) return
         if (resultCode != Activity.RESULT_OK) {
             if (preferences.getString(STATE_SOURCE_URI, null) == null) {
@@ -231,7 +187,7 @@ class MainActivity : AppCompatActivity() {
                 .getOrDefault(
                     VideoLibrary.IndexResult(
                         videos = emptyList(),
-                        seasons = emptyList(),
+                        shows = emptyList(),
                         fromCache = false,
                         savedToUsb = false
                     )
@@ -239,9 +195,13 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 loadingVideos = false
                 videos = loaded.videos
-                seasons = loaded.seasons
-                selectedSeason = selectedSeason.takeIf { seasons.contains(it) }
-                    ?: seasons.firstOrNull()
+                shows = loaded.shows
+                selectedShow = selectedShow.takeIf { shows.contains(it) }
+                    ?: shows.firstOrNull()
+                    ?: VideoItem.DEFAULT_SHOW
+                val availableSeasons = VideoLibrary.seasonsFor(videos, selectedShow)
+                selectedSeason = selectedSeason.takeIf { availableSeasons.contains(it) }
+                    ?: availableSeasons.firstOrNull()
                     ?: VideoItem.DEFAULT_SEASON
                 preferences.edit().putString(STATE_SELECTED_SEASON, selectedSeason).apply()
                 if (loaded.videos.isNotEmpty() && !loaded.savedToUsb) {
@@ -272,7 +232,12 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 loadingVideos = false
                 videos = loaded
-                seasons = emptyList()
+                shows = loaded.map { it.showName }.distinct().sorted()
+                selectedShow = selectedShow.takeIf { shows.contains(it) }
+                    ?: shows.firstOrNull()
+                    ?: VideoItem.DEFAULT_SHOW
+                selectedSeason = VideoLibrary.seasonsFor(videos, selectedShow).firstOrNull()
+                    ?: VideoItem.DEFAULT_SEASON
                 selectedSeason = VideoItem.DEFAULT_SEASON
                 updateUi()
             }
@@ -293,21 +258,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun changeEpisodeCount(delta: Int) {
-        syncEpisodeCountWithQuota()
-        episodeCount = (episodeCount + delta).coerceIn(1, selectableEpisodeMaximum())
-        updateUi()
-    }
-
-    private fun selectMode(mode: WatchMode) {
-        watchMode = mode
-        updateUi()
-    }
-
     private fun startWatching() {
         if (loadingVideos) return
-        val dailyRemaining = watchHistory.getDailyRemaining()
-        if (dailyRemaining == 0) {
+        if (watchHistory.getDailyRemaining() == 0) {
             statusText.setText(R.string.daily_quota_used)
             Toast.makeText(this, R.string.daily_quota_used, Toast.LENGTH_LONG).show()
             return
@@ -317,55 +270,31 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.no_videos, Toast.LENGTH_LONG).show()
             return
         }
-        val plannedCount = minOf(episodeCount, dailyRemaining)
-        val playlist = VideoLibrary.buildPlaylist(selectedVideos(), watchMode, plannedCount) {
-            watchHistory.isWatched(it)
-        }
-        if (playlist.isEmpty()) {
-            statusText.setText(R.string.all_videos_watched)
+        val lastVideo = watchHistory.getLastPlayedVideo()
+        val startVideo = videos.firstOrNull { it.uri == lastVideo?.uri && !watchHistory.isWatched(it) }
+            ?: videos.firstOrNull { it.showName == lastVideo?.showName && !watchHistory.isWatched(it) }
+            ?: videos.firstOrNull { it.showName == lastVideo?.showName }
+            ?: videos.firstOrNull()
+        if (startVideo == null) {
+            statusText.setText(R.string.no_videos)
             return
         }
-        if (playlist.size < plannedCount) {
-            val message = getString(R.string.not_enough_videos, playlist.size)
-            statusText.text = message
-            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        }
-        launchPlaylist(playlist, plannedCount)
+        launchPlaylist(VideoLibrary.playlistFrom(videos, startVideo))
     }
 
-    private fun selectedVideos(): List<VideoItem> {
-        return if (seasons.size <= 1) videos else videos.filter { it.season == selectedSeason }
-    }
-
-    private fun launchPlaylist(playlist: List<VideoItem>, plannedCount: Int) {
+    private fun launchPlaylist(playlist: List<VideoItem>) {
         if (playlist.isEmpty()) return
         preferences.edit()
-            .putInt(STATE_EPISODE_COUNT, plannedCount)
-            .putString(STATE_WATCH_MODE, watchMode.name)
+            .putString(STATE_SELECTED_SHOW, selectedShow)
             .putString(STATE_SELECTED_SEASON, selectedSeason)
             .apply()
         speechCoach?.stop()
         val intent = Intent(this, PlayerActivity::class.java)
             .putParcelableArrayListExtra(EXTRA_PLAYLIST, ArrayList(playlist))
-            .putExtra(EXTRA_PROMISED_COUNT, playlist.size)
-        startActivity(intent)
+        startActivityForResult(intent, REQUEST_PLAY_VIDEO)
     }
 
     private fun updateUi() {
-        syncEpisodeCountWithQuota()
-        episodeCountText.text = getString(R.string.episode_count_value, episodeCount)
-        listOf(
-            normalButton to WatchMode.NORMAL,
-            miniButton to WatchMode.MINI,
-            randomButton to WatchMode.RANDOM
-        ).forEach { (button, mode) ->
-            button.isSelected = mode == watchMode
-            button.setTextColor(
-                if (mode == watchMode) getColor(R.color.text_primary)
-                else getColor(R.color.text_secondary)
-            )
-        }
-
         val dailyCount = watchHistory.getDailyCount()
         val dailyLimit = watchHistory.getDailyLimit()
         dailyProgressBar.max = dailyLimit
@@ -377,14 +306,16 @@ class MainActivity : AppCompatActivity() {
             watchHistory.getDailyRemaining()
         )
         startButton.isEnabled = watchHistory.getDailyRemaining() > 0
-        startButton.setText(
-            if (watchHistory.getDailyRemaining() > 0) {
-                R.string.start_watching
-            } else {
-                R.string.daily_quota_used_short
-            }
-        )
-        chooseEpisodeButton.text = getString(R.string.choose_episode, selectedSeason)
+        if (watchHistory.getDailyRemaining() == 0) {
+            startButton.setText(R.string.daily_quota_used_short)
+        } else {
+            val lastVideo = watchHistory.getLastPlayedVideo()
+            val hasResume = videos.any { it.uri == lastVideo?.uri && watchHistory.getSavedPosition(it) > 0 }
+            startButton.setText(
+                if (hasResume) R.string.resume_last_episode else R.string.start_watching
+            )
+        }
+        chooseEpisodeButton.text = getString(R.string.choose_episode)
         chooseEpisodeButton.isEnabled = videos.isNotEmpty()
 
         if (!loadingVideos) {
@@ -394,21 +325,11 @@ class MainActivity : AppCompatActivity() {
                 videos.isEmpty() -> getString(R.string.no_videos)
                 savedUri == DEVICE_LIBRARY_URI -> getString(R.string.source_media_count, videos.size)
                 else -> {
-                    val available = VideoLibrary.filterByMode(selectedVideos(), watchMode).size
-                    val seasonLabel = if (seasons.size > 1) " · $selectedSeason" else ""
-                    getString(R.string.source_selected, "已找到 $available 个视频$seasonLabel")
+                    val showLabel = if (shows.size == 1) shows.first() else "${shows.size}部动画"
+                    getString(R.string.source_selected, "$showLabel · ${videos.size} 个视频")
                 }
             }
         }
-    }
-
-    private fun selectableEpisodeMaximum(): Int {
-        val remaining = watchHistory.getDailyRemaining()
-        return if (remaining == 0) 1 else minOf(MAX_EPISODES, watchHistory.getDailyLimit(), remaining)
-    }
-
-    private fun syncEpisodeCountWithQuota() {
-        episodeCount = episodeCount.coerceIn(1, selectableEpisodeMaximum())
     }
 
     private fun openParentCenter() {
@@ -529,6 +450,7 @@ class MainActivity : AppCompatActivity() {
                 R.string.parent_center_summary,
                 watchHistory.getDailyCount(),
                 watchHistory.getDailyLimit(),
+                watchHistory.getTotalPlayCount(),
                 watchHistory.getWatchedCount()
             )
         }
@@ -614,49 +536,60 @@ class MainActivity : AppCompatActivity() {
         }
         val dialog = createStyledDialog(R.layout.dialog_video_picker)
         val contentView = dialog.findViewById<android.view.View>(android.R.id.content)
-        val seasonGrid = contentView.findViewById<GridLayout>(R.id.seasonGrid)
+        val showRow = contentView.findViewById<android.widget.LinearLayout>(R.id.showRow)
+        val seasonRow = contentView.findViewById<android.widget.LinearLayout>(R.id.seasonRow)
         val videoGrid = contentView.findViewById<GridLayout>(R.id.videoGrid)
         val density = resources.displayMetrics.density
-        val spacing = (8 * density).toInt()
+        val cardSpacing = (12 * density).toInt()
+        val backdrops = listOf(
+            R.drawable.library_backdrop_1,
+            R.drawable.library_backdrop_2,
+            R.drawable.library_backdrop_3,
+            R.drawable.library_backdrop_4
+        )
 
         fun renderVideos() {
             videoGrid.removeAllViews()
-            selectedVideos().forEach { video ->
-                val button = Button(this)
-                button.text = video.displayName
-                button.textSize = 16f
-                button.maxLines = 2
-                button.ellipsize = TextUtils.TruncateAt.END
-                button.isAllCaps = false
-                button.stateListAnimator = null
-                button.setTextColor(getColor(R.color.text_primary))
-                button.background = getDrawable(R.drawable.parent_option_button)
-                button.layoutParams = GridLayout.LayoutParams().apply {
+            VideoLibrary.episodesFor(videos, selectedShow, selectedSeason).forEach { video ->
+                val card = layoutInflater.inflate(R.layout.item_episode_card, videoGrid, false)
+                val nameText = card.findViewById<TextView>(R.id.episodeNameText)
+                val stateText = card.findViewById<TextView>(R.id.episodeStateText)
+                val playCountText = card.findViewById<TextView>(R.id.episodePlayCountText)
+                val progress = watchHistory.getSavedPosition(video)
+                nameText.text = video.displayName
+                stateText.text = when {
+                    progress > 0 -> "▶"
+                    watchHistory.isWatched(video) -> "✓"
+                    else -> ""
+                }
+                val playCount = watchHistory.getPlayCount(video)
+                playCountText.text = getString(R.string.play_count_badge, playCount)
+                playCountText.visibility = if (playCount > 0) android.view.View.VISIBLE else android.view.View.GONE
+                card.layoutParams = GridLayout.LayoutParams().apply {
                     width = 0
-                    height = (64 * density).toInt()
+                    height = (88 * density).toInt()
                     columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
                     rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                    setMargins(0, 0, spacing, spacing)
+                    setMargins(0, 0, cardSpacing, cardSpacing)
                 }
-                button.setOnClickListener {
+                card.setOnClickListener {
                     if (watchHistory.getDailyRemaining() == 0) {
                         Toast.makeText(this, R.string.daily_quota_used, Toast.LENGTH_LONG).show()
                         return@setOnClickListener
                     }
-                    val plannedCount = minOf(episodeCount, watchHistory.getDailyRemaining())
-                    val playlist = selectedVideos()
-                        .dropWhile { it.uri != video.uri }
-                        .take(plannedCount)
                     dialog.dismiss()
-                    launchPlaylist(playlist, plannedCount)
+                    selectedShow = video.showName
+                    selectedSeason = video.season
+                    launchPlaylist(VideoLibrary.playlistFrom(videos, video))
                 }
-                videoGrid.addView(button)
+                videoGrid.addView(card)
             }
         }
 
         fun renderSeasons() {
-            seasonGrid.removeAllViews()
-            val availableSeasons = seasons.ifEmpty { listOf(VideoItem.DEFAULT_SEASON) }
+            seasonRow.removeAllViews()
+            val availableSeasons = VideoLibrary.seasonsFor(videos, selectedShow)
+                .ifEmpty { listOf(VideoItem.DEFAULT_SEASON) }
             availableSeasons.forEach { season ->
                 val button = Button(this)
                 button.text = season
@@ -666,36 +599,70 @@ class MainActivity : AppCompatActivity() {
                 button.isAllCaps = false
                 button.stateListAnimator = null
                 button.isSelected = season == selectedSeason
-                button.setTextColor(
-                    if (button.isSelected) getColor(R.color.text_primary)
-                    else getColor(R.color.text_secondary)
-                )
-                button.background = getDrawable(R.drawable.parent_limit_button)
-                button.layoutParams = GridLayout.LayoutParams().apply {
-                    width = 0
-                    height = (58 * density).toInt()
-                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                    rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                    setMargins(0, 0, spacing, spacing)
+                button.background = getDrawable(R.drawable.season_chip)
+                button.setTextColor(getColor(R.color.text_primary))
+                button.minimumWidth = (128 * density).toInt()
+                button.layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    (48 * density).toInt()
+                ).apply {
+                    marginEnd = cardSpacing
                 }
                 button.setOnClickListener {
                     selectedSeason = season
                     preferences.edit().putString(STATE_SELECTED_SEASON, selectedSeason).apply()
                     renderSeasons()
                     renderVideos()
-                    seasonGrid.getChildAt(availableSeasons.indexOf(season))?.requestFocus()
+                    seasonRow.getChildAt(availableSeasons.indexOf(season))?.requestFocus()
                     updateUi()
                 }
-                seasonGrid.addView(button)
+                seasonRow.addView(button)
             }
         }
 
+        fun renderShows() {
+            showRow.removeAllViews()
+            val availableShows = shows.ifEmpty { listOf(VideoItem.DEFAULT_SHOW) }
+            availableShows.forEach { showName ->
+                val index = availableShows.indexOf(showName)
+                val episodes = VideoLibrary.episodesFor(videos, showName)
+                val card = layoutInflater.inflate(R.layout.item_show_card, showRow, false)
+                val backdrop = card.findViewById<android.widget.ImageView>(R.id.showBackdrop)
+                val showNameText = card.findViewById<TextView>(R.id.showNameText)
+                val showCountText = card.findViewById<TextView>(R.id.showCountText)
+                backdrop.setImageResource(backdrops[index % backdrops.size])
+                showNameText.text = showName
+                showCountText.text = getString(R.string.show_episode_count, episodes.size)
+                card.isSelected = showName == selectedShow
+                card.layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = cardSpacing
+                }
+                card.setOnClickListener {
+                    selectedShow = showName
+                    selectedSeason = VideoLibrary.seasonsFor(videos, selectedShow).firstOrNull()
+                        ?: VideoItem.DEFAULT_SEASON
+                    renderShows()
+                    renderSeasons()
+                    renderVideos()
+                    showRow.getChildAt(index)?.requestFocus()
+                    updateUi()
+                }
+                showRow.addView(card)
+            }
+        }
+
+        renderShows()
         renderSeasons()
         renderVideos()
         contentView.findViewById<Button>(R.id.videoPickerCloseButton).setOnClickListener {
             dialog.dismiss()
         }
         dialog.show()
+        val selectedShowIndex = shows.indexOf(selectedShow).coerceAtLeast(0)
+        showRow.getChildAt(selectedShowIndex)?.requestFocus()
     }
 
     private fun rebuildVideoIndex() {
@@ -723,14 +690,14 @@ class MainActivity : AppCompatActivity() {
             val screenWidth = resources.displayMetrics.widthPixels
             val screenHeight = resources.displayMetrics.heightPixels
             val desiredWidth = when (layoutId) {
-                R.layout.dialog_video_picker -> 760
+                R.layout.dialog_video_picker -> 1000
                 R.layout.dialog_parent_pin -> 500
                 R.layout.dialog_parent_limit -> 620
                 else -> 660
             }
             val width = minOf((desiredWidth * density).toInt(), screenWidth - (48 * density).toInt())
             val height = if (layoutId == R.layout.dialog_video_picker) {
-                minOf((480 * density).toInt(), screenHeight - (40 * density).toInt())
+                minOf((620 * density).toInt(), screenHeight - (32 * density).toInt())
             } else {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             }
@@ -750,13 +717,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun speakWelcome() {
         if (!speechReady) return
-        speechCoach?.speak(getString(R.string.speak_welcome, episodeCount))
+        speechCoach?.speak(getString(R.string.speak_welcome))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putInt(STATE_EPISODE_COUNT, episodeCount)
-        outState.putSerializable(STATE_WATCH_MODE, watchMode)
+        outState.putString(STATE_SELECTED_SHOW, selectedShow)
         outState.putString(STATE_SELECTED_SEASON, selectedSeason)
     }
 
@@ -800,16 +766,13 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PREFERENCES_NAME = "yoyo_cartoon"
         private const val STATE_SOURCE_URI = "source_uri"
-        private const val STATE_EPISODE_COUNT = "episode_count"
-        private const val STATE_WATCH_MODE = "watch_mode"
+        private const val STATE_SELECTED_SHOW = "selected_show"
         private const val STATE_SELECTED_SEASON = "selected_season"
         private const val PARENT_PIN_HASH = "parent_pin_hash"
         private const val REQUEST_FOLDER = 1001
         private const val REQUEST_VIDEO_PERMISSION = 1002
+        private const val REQUEST_PLAY_VIDEO = 1003
         private const val DEVICE_LIBRARY_URI = "device-media"
         const val EXTRA_PLAYLIST = "playlist"
-        const val EXTRA_PROMISED_COUNT = "promised_count"
-        private const val DEFAULT_EPISODES = 4
-        private const val MAX_EPISODES = 12
     }
 }

@@ -1,10 +1,11 @@
 package com.yoyo.yycartoon
 
-import android.content.Context
 import android.content.ContentUris
-import android.net.Uri
+import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
@@ -12,27 +13,21 @@ import java.security.MessageDigest
 import java.text.Collator
 import java.util.Locale
 
-enum class WatchMode {
-    NORMAL,
-    MINI,
-    RANDOM
-}
-
 object VideoLibrary {
     private val videoExtensions = setOf("mp4", "mkv", "avi", "mov", "webm", "m4v", "3gp", "ts")
     private const val INDEX_FILE_NAME = ".yycartoon-index.db"
-    private const val INDEX_SCHEMA_VERSION = 1
+    private const val INDEX_SCHEMA_VERSION = 2
 
     data class IndexResult(
         val videos: List<VideoItem>,
-        val seasons: List<String>,
+        val shows: List<String>,
         val fromCache: Boolean,
         val savedToUsb: Boolean
     )
 
     fun load(context: Context, treeUri: Uri, forceRebuild: Boolean = false): IndexResult {
-        val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyResult(savedToUsb = false)
-        if (!root.isDirectory) return emptyResult(savedToUsb = false)
+        val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyResult(false)
+        if (!root.isDirectory) return emptyResult(false)
 
         if (!forceRebuild) {
             val localFile = localIndexFile(context, treeUri)
@@ -41,30 +36,140 @@ object VideoLibrary {
                 readIndex(localFile, treeUri)?.let { return it }
             }
         }
-
         return rebuildIndex(context, treeUri, root)
     }
 
+    fun loadFromMediaStore(context: Context): List<VideoItem> {
+        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                MediaStore.Video.Media.RELATIVE_PATH
+            )
+        } else {
+            arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                MediaStore.Video.Media.DATA
+            )
+        }
+        val videos = mutableListOf<VideoItem>()
+        context.contentResolver.query(
+            collection,
+            projection,
+            null,
+            null,
+            "${MediaStore.Video.Media.DATE_MODIFIED} DESC"
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(0)
+                val displayName = cursor.getString(1)?.removeExtension() ?: continue
+                val rawFolder = cursor.getString(2).orEmpty()
+                val folderPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    rawFolder.substringBeforeLast("/")
+                } else {
+                    rawFolder
+                }
+                val folders = folderPath
+                    .trimEnd('/', File.separatorChar)
+                    .split('/', File.separatorChar)
+                    .filter { it.isNotBlank() }
+                val (showName, season) = when {
+                    folders.size >= 2 -> folders.takeLast(2).let { it[0] to it[1] }
+                    folders.size == 1 -> folders[0] to VideoItem.DEFAULT_SEASON
+                    else -> VideoItem.DEFAULT_SHOW to VideoItem.DEFAULT_SEASON
+                }
+                videos.add(
+                    VideoItem(
+                        uri = ContentUris.withAppendedId(collection, id),
+                        displayName = displayName,
+                        showName = showName,
+                        season = season,
+                        relativePath = folderPath + displayName
+                    )
+                )
+            }
+        }
+        return sortVideos(videos)
+    }
+
+    fun seasonsFor(videos: List<VideoItem>, showName: String): List<String> {
+        return videos.asSequence()
+            .filter { it.showName == showName }
+            .map { it.season }
+            .distinct()
+            .sortedWith(naturalOrder())
+            .toList()
+    }
+
+    fun episodesFor(
+        videos: List<VideoItem>,
+        showName: String,
+        season: String? = null
+    ): List<VideoItem> {
+        return videos.filter { video ->
+            video.showName == showName && (season == null || video.season == season)
+        }
+    }
+
+    fun playlistFrom(videos: List<VideoItem>, startVideo: VideoItem): List<VideoItem> {
+        val orderedShow = episodesFor(videos, startVideo.showName)
+        val startIndex = orderedShow.indexOfFirst { it.uri == startVideo.uri }
+        if (startIndex < 0) return listOf(startVideo)
+        return orderedShow.drop(startIndex)
+    }
+
     private fun emptyResult(savedToUsb: Boolean): IndexResult {
-        return IndexResult(
-            videos = emptyList(),
-            seasons = emptyList(),
-            fromCache = false,
-            savedToUsb = savedToUsb
-        )
+        return IndexResult(emptyList(), emptyList(), false, savedToUsb)
     }
 
     private fun rebuildIndex(context: Context, treeUri: Uri, root: DocumentFile): IndexResult {
         val videos = mutableListOf<VideoItem>()
         collectVideos(root, videos, 0)
-        val localFile = writeIndex(context, treeUri, videos)
+        val sorted = sortVideos(videos)
+        val localFile = writeIndex(context, treeUri, sorted)
         val savedToUsb = exportIndexToUsb(context, root, localFile)
-        return IndexResult(
-            videos = sortVideos(videos),
-            seasons = videos.map { it.season }.distinct().sortedWith(naturalOrder()),
-            fromCache = false,
-            savedToUsb = savedToUsb
-        )
+        return IndexResult(sorted, showsFor(sorted), false, savedToUsb)
+    }
+
+    private fun collectVideos(
+        directory: DocumentFile,
+        output: MutableList<VideoItem>,
+        depth: Int,
+        showName: String = VideoItem.DEFAULT_SHOW,
+        season: String = VideoItem.DEFAULT_SEASON,
+        parentPath: String = ""
+    ) {
+        if (depth > 6) return
+        directory.listFiles().forEach { file ->
+            val name = file.name.orEmpty()
+            when {
+                file.isDirectory -> {
+                    val nextShow = if (depth == 0) name.ifEmpty { showName } else showName
+                    val nextSeason = if (depth == 1) name.ifEmpty { season } else season
+                    collectVideos(
+                        directory = file,
+                        output = output,
+                        depth = depth + 1,
+                        showName = nextShow,
+                        season = nextSeason,
+                        parentPath = parentPath + name + "/"
+                    )
+                }
+                file.isFile && name.substringAfterLast('.', "").lowercase(Locale.ROOT) in videoExtensions -> {
+                    output.add(
+                        VideoItem(
+                            uri = file.uri,
+                            displayName = name.removeExtension(),
+                            showName = showName,
+                            season = season,
+                            relativePath = parentPath + name
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private fun importUsbIndex(context: Context, root: DocumentFile, target: File): Boolean {
@@ -79,7 +184,7 @@ object VideoLibrary {
             }
             if (temporaryFile.length() == 0L) error("USB index is empty")
             target.delete()
-            if (!temporaryFile.renameTo(target)) error("Cannot replace local index")
+            check(temporaryFile.renameTo(target)) { "Cannot replace local index" }
             true
         }.getOrElse {
             temporaryFile.delete()
@@ -91,12 +196,12 @@ object VideoLibrary {
         val databaseFile = localIndexFile(context, treeUri)
         databaseFile.parentFile?.mkdirs()
         databaseFile.delete()
-        val database = SQLiteDatabase.openOrCreateDatabase(databaseFile, null)
-        database.use {
-            it.execSQL(
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { database ->
+            database.execSQL(
                 """
                 CREATE TABLE videos (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    show_name TEXT NOT NULL,
                     season TEXT NOT NULL,
                     relative_path TEXT NOT NULL UNIQUE,
                     display_name TEXT NOT NULL,
@@ -104,21 +209,22 @@ object VideoLibrary {
                 )
                 """.trimIndent()
             )
-            it.execSQL("CREATE INDEX index_videos_season ON videos(season)")
-            it.beginTransaction()
-            val statement = it.compileStatement(
-                "INSERT OR REPLACE INTO videos(season, relative_path, display_name, uri) VALUES(?, ?, ?, ?)"
+            database.execSQL("CREATE INDEX index_videos_show_season ON videos(show_name, season)")
+            database.beginTransaction()
+            val statement = database.compileStatement(
+                "INSERT INTO videos(show_name, season, relative_path, display_name, uri) VALUES(?, ?, ?, ?, ?)"
             )
             videos.forEach { video ->
-                statement.bindString(1, video.season)
-                statement.bindString(2, video.relativePath)
-                statement.bindString(3, video.displayName)
-                statement.bindString(4, video.uri.toString())
+                statement.bindString(1, video.showName)
+                statement.bindString(2, video.season)
+                statement.bindString(3, video.relativePath)
+                statement.bindString(4, video.displayName)
+                statement.bindString(5, video.uri.toString())
                 statement.executeInsert()
             }
-            it.setTransactionSuccessful()
-            it.endTransaction()
-            it.execSQL(
+            database.setTransactionSuccessful()
+            database.endTransaction()
+            database.execSQL(
                 """
                 CREATE TABLE metadata (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -128,13 +234,11 @@ object VideoLibrary {
                 )
                 """.trimIndent()
             )
-            it.execSQL(
-                """
-                INSERT INTO metadata(id, schema_version, tree_uri, updated_at)
-                VALUES(1, $INDEX_SCHEMA_VERSION, '${treeUri.toString().replace("'", "''")}', ${System.currentTimeMillis()})
-                """.trimIndent()
+            database.execSQL(
+                "INSERT INTO metadata(id, schema_version, tree_uri, updated_at) VALUES(1, ?, ?, ?)",
+                arrayOf(INDEX_SCHEMA_VERSION, treeUri.toString(), System.currentTimeMillis().toString())
             )
-            it.execSQL("PRAGMA user_version = $INDEX_SCHEMA_VERSION")
+            database.version = INDEX_SCHEMA_VERSION
         }
         return databaseFile
     }
@@ -159,7 +263,7 @@ object VideoLibrary {
                 null,
                 SQLiteDatabase.OPEN_READONLY
             ).use { database ->
-                if (database.getVersion() != INDEX_SCHEMA_VERSION) return@use null
+                if (database.version != INDEX_SCHEMA_VERSION) return@use null
                 val metadata = database.rawQuery(
                     "SELECT tree_uri FROM metadata WHERE id = 1",
                     null
@@ -168,98 +272,30 @@ object VideoLibrary {
                 }
                 if (metadata != treeUri.toString()) return@use null
                 val videos = database.rawQuery(
-                    "SELECT uri, display_name, season, relative_path FROM videos",
+                    "SELECT uri, display_name, show_name, season, relative_path FROM videos",
                     null
                 ).use { cursor ->
                     buildList {
-                        while (cursor.moveToNext()) {
-                            add(cursor.toVideoItem())
-                        }
+                        while (cursor.moveToNext()) add(cursor.toVideoItem())
                     }
                 }
-                IndexResult(
-                    videos = sortVideos(videos),
-                    seasons = videos.map { it.season }.distinct().sortedWith(naturalOrder()),
-                    fromCache = true,
-                    savedToUsb = true
-                )
+                IndexResult(sortVideos(videos), showsFor(videos), true, true)
             }
         }.getOrNull()
+    }
+
+    private fun showsFor(videos: List<VideoItem>): List<String> {
+        return videos.map { it.showName }.distinct().sortedWith(naturalOrder())
     }
 
     private fun Cursor.toVideoItem(): VideoItem {
         return VideoItem(
             uri = Uri.parse(getString(0) ?: Uri.EMPTY.toString()),
             displayName = getString(1).orEmpty(),
-            season = getString(2).orEmpty().ifEmpty { VideoItem.DEFAULT_SEASON },
-            relativePath = getString(3).orEmpty()
+            showName = getString(2).orEmpty().ifEmpty { VideoItem.DEFAULT_SHOW },
+            season = getString(3).orEmpty().ifEmpty { VideoItem.DEFAULT_SEASON },
+            relativePath = getString(4).orEmpty()
         )
-    }
-
-    fun loadFromMediaStore(context: Context): List<VideoItem> {
-        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(
-            MediaStore.Video.Media._ID,
-            MediaStore.Video.Media.DISPLAY_NAME
-        )
-        val videos = mutableListOf<VideoItem>()
-        context.contentResolver.query(
-            collection,
-            projection,
-            null,
-            null,
-            "${MediaStore.Video.Media.DATE_MODIFIED} DESC"
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val displayName = cursor.getString(nameColumn) ?: continue
-                videos.add(
-                    VideoItem(
-                        ContentUris.withAppendedId(collection, id),
-                        displayName.removeExtension()
-                    )
-                )
-            }
-        }
-        val order = naturalOrder()
-        return videos.sortedWith { left, right ->
-            order.compare(left.displayName, right.displayName)
-        }
-    }
-
-    private fun collectVideos(
-        directory: DocumentFile,
-        output: MutableList<VideoItem>,
-        depth: Int,
-        season: String = VideoItem.DEFAULT_SEASON,
-        parentPath: String = ""
-    ) {
-        if (depth > 6) return
-        directory.listFiles().forEach { file ->
-            when {
-                file.isDirectory -> collectVideos(
-                    directory = file,
-                    output = output,
-                    depth = depth + 1,
-                    season = if (depth == 0) file.name.orEmpty().ifEmpty { season } else season,
-                    parentPath = parentPath + (file.name ?: "") + "/"
-                )
-                file.isFile && file.name?.substringAfterLast('.', "")?.lowercase(Locale.ROOT) in videoExtensions -> {
-                    file.name?.let { name ->
-                        output.add(
-                            VideoItem(
-                                uri = file.uri,
-                                displayName = name.removeExtension(),
-                                season = season,
-                                relativePath = parentPath + name
-                            )
-                        )
-                    }
-                }
-            }
-        }
     }
 
     private fun localIndexFile(context: Context, treeUri: Uri): File {
@@ -273,36 +309,14 @@ object VideoLibrary {
     private fun sortVideos(videos: List<VideoItem>): List<VideoItem> {
         val order = naturalOrder()
         return videos.sortedWith { left, right ->
-            val seasonResult = order.compare(left.season, right.season)
-            if (seasonResult != 0) seasonResult else order.compare(left.displayName, right.displayName)
+            val showResult = order.compare(left.showName, right.showName)
+            if (showResult != 0) {
+                showResult
+            } else {
+                val seasonResult = order.compare(left.season, right.season)
+                if (seasonResult != 0) seasonResult else order.compare(left.displayName, right.displayName)
+            }
         }
-    }
-
-    fun filterByMode(videos: List<VideoItem>, mode: WatchMode): List<VideoItem> {
-        return when (mode) {
-            WatchMode.NORMAL -> videos.filterNot { it.isMiniEpisode() }
-            WatchMode.MINI -> videos.filter { it.isMiniEpisode() }
-            WatchMode.RANDOM -> videos
-        }
-    }
-
-    fun buildPlaylist(
-        videos: List<VideoItem>,
-        mode: WatchMode,
-        selectedCount: Int,
-        isWatched: (VideoItem) -> Boolean
-    ): List<VideoItem> {
-        val candidates = filterByMode(videos, mode).filterNot(isWatched)
-        return if (mode == WatchMode.RANDOM) {
-            candidates.shuffled().take(selectedCount)
-        } else {
-            candidates.take(selectedCount)
-        }
-    }
-
-    private fun VideoItem.isMiniEpisode(): Boolean {
-        val lower = displayName.lowercase(Locale.ROOT)
-        return listOf("迷你", "mini", "短片", "小小的").any { lower.contains(it) }
     }
 
     private fun String.removeExtension(): String {

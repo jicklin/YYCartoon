@@ -130,147 +130,16 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/episode_count_question"
+                android:text="@string/library_hint"
                 android:textColor="@color/text_secondary"
                 android:textSize="17sp" />
-
-            <LinearLayout
-                android:id="@+id/episodeSelector"
-                android:layout_width="match_parent"
-                android:layout_height="112dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/episode_card"
-                android:descendantFocusability="beforeDescendants"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:nextFocusDown="@id/normalButton"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/decreaseButton"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:background="@drawable/round_button"
-                    android:clickable="true"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="－"
-                    android:textColor="@color/text_primary"
-                    android:textSize="27sp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/episode_count_label"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:id="@+id/episodeCountText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/accent_yellow"
-                        android:textSize="40sp"
-                        android:textStyle="bold"
-                        tools:text="4 集" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/episode_selector_hint"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/increaseButton"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:background="@drawable/round_button"
-                    android:clickable="true"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="＋"
-                    android:textColor="@color/text_primary"
-                    android:textSize="27sp" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/episode_mode_title"
-                android:textColor="@color/text_primary"
-                android:textSize="17sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/normalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@drawable/mode_button"
-                    android:nextFocusUp="@id/episodeSelector"
-                    android:nextFocusDown="@id/startButton"
-                    android:stateListAnimator="@null"
-                    android:text="@string/content_type_normal"
-                    android:textAllCaps="false"
-                    android:textSize="17sp" />
-
-                <Button
-                    android:id="@+id/miniButton"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="10dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/mode_button"
-                    android:nextFocusUp="@id/episodeSelector"
-                    android:nextFocusDown="@id/startButton"
-                    android:stateListAnimator="@null"
-                    android:text="@string/content_type_mini"
-                    android:textAllCaps="false"
-                    android:textSize="17sp" />
-
-                <Button
-                    android:id="@+id/randomButton"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="10dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/mode_button"
-                    android:nextFocusUp="@id/episodeSelector"
-                    android:nextFocusDown="@id/startButton"
-                    android:stateListAnimator="@null"
-                    android:text="@string/content_type_random"
-                    android:textAllCaps="false"
-                    android:textSize="17sp" />
-            </LinearLayout>
 
             <Button
                 android:id="@+id/startButton"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:layout_marginTop="10dp"
+                android:layout_height="72dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/primary_button"
-                android:nextFocusUp="@id/normalButton"
                 android:nextFocusDown="@id/chooseEpisodeButton"
                 android:stateListAnimator="@null"
                 android:text="@string/start_watching"
@@ -282,8 +151,8 @@
             <Button
                 android:id="@+id/chooseEpisodeButton"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="64dp"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/secondary_button"
                 android:nextFocusUp="@id/startButton"
                 android:nextFocusDown="@id/chooseFolderButton"
@@ -291,12 +160,13 @@
                 android:text="@string/choose_episode"
                 android:textAllCaps="false"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
                 android:orientation="horizontal">
 
                 <Button
@@ -307,7 +177,6 @@
                     android:background="@drawable/secondary_button"
                     android:nextFocusUp="@id/chooseEpisodeButton"
                     android:nextFocusRight="@id/parentCenterButton"
-                    android:nextFocusDown="@id/episodeSelector"
                     android:stateListAnimator="@null"
                     android:text="@string/choose_video_folder"
                     android:textAllCaps="false"
@@ -321,9 +190,8 @@
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
                     android:background="@drawable/secondary_button"
-                    android:nextFocusUp="@id/startButton"
+                    android:nextFocusUp="@id/chooseEpisodeButton"
                     android:nextFocusLeft="@id/chooseFolderButton"
-                    android:nextFocusDown="@id/episodeSelector"
                     android:stateListAnimator="@null"
                     android:text="@string/parent_center"
                     android:textAllCaps="false"
